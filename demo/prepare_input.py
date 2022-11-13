@@ -8,8 +8,7 @@ def read_file(file_name):
     if isinstance(input_file, dict):
         key = 'dataSet'
         if key not in input_file:
-            dict_key_list = list(input_file.keys())
-            key = dict_key_list[-1]
+            key = list(input_file.keys())[-1]
 
         dataset = input_file[key]
         return dataset
