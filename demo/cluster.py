@@ -110,20 +110,35 @@ def merge(subgraph, K, outliers, kneighbor_indexs, data):
         else:
             outliers.append(int(list(item)[0]))
 
+    if len(res_cluster) < K:
+        return cut(res_cluster, K, kneighbor_indexs)
+
+    n = len(res_cluster)
+    dm = np.full((n, n), np.inf)
+    for i in range(n):
+        for j in range(i + 1, n):
+            dm[i][j] = fun_dis(res_cluster[i], res_cluster[j], kneighbor_indexs, data)
+
     while len(res_cluster) > K:
-        n = len(res_cluster)
-        dm = np.full((n, n), np.inf)
-
-        for i in range(n):
-            for j in range(i+1, n):
-                dm[i][j] = fun_dis(res_cluster[i], res_cluster[j], kneighbor_indexs, data)
-
         mindi = np.amin(dm)
         mindi_index = np.where(dm <= mindi)
         rc_i, rc_j = (mindi_index[0][0], mindi_index[1][0]) if len(mindi_index[0]) <= 1 else sec_screen(mindi_index, res_cluster, data)
-
         res_cluster[rc_i].extend(res_cluster.pop(rc_j))
         print('.', end='')
+
+        if len(res_cluster) <= K:
+            break
+        if rc_i >= rc_j:
+            print('Error: rc_i >= rc_j')
+
+        dm = np.delete(dm, rc_j, axis=0)
+        dm = np.delete(dm, rc_j, axis=1)
+        for i in range(len(res_cluster)):
+            if i < rc_i:
+                dm[i][rc_i] = fun_dis(res_cluster[i], res_cluster[rc_i], kneighbor_indexs, data)
+            elif i > rc_i:
+                dm[rc_i][i] = fun_dis(res_cluster[i], res_cluster[rc_i], kneighbor_indexs, data)
+
 
     return res_cluster
 
@@ -223,7 +238,6 @@ def cluster(data, K, ka=10, la=0.2, si=0.65):
     print('Clustering.', end='')
     points = [i for i in range(n_rows)]
     KNN_graph, kneighbor_indexs, neighbor_indexs, n_rknn = build_KNN_graph(data, n_rows, k)
-
     outliers = [i for i in points if n_rknn[i] <= sorted(n_rknn)[round(n_rows*la)]]
     KNN_graph_splitted = split_KNN_graph(KNN_graph, outliers, kneighbor_indexs, neighbor_indexs, round(k*si))
     subgraph = list(nx.connected_components(KNN_graph_splitted))
@@ -233,7 +247,6 @@ def cluster(data, K, ka=10, la=0.2, si=0.65):
     else:
         res_subgraph = merge(subgraph, K, outliers, kneighbor_indexs, data) if len(subgraph) > K else cut(subgraph, K, kneighbor_indexs)
     res_cluster = assign_outliers(res_subgraph, outliers, data)
-
     cluster_label = np.zeros(n_rows)
     for index, clu in enumerate(res_cluster):
         cluster_label[clu] = (index+1)
